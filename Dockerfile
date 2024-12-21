@@ -14,6 +14,9 @@ RUN apt-get update && \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
+RUN apt-get install -y ca-certificates && \
+    update-ca-certificates
+
 # Install Miniconda
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
     bash miniconda.sh -b -p $HOME/miniconda && \
