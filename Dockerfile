@@ -12,7 +12,9 @@ RUN apt-get update && \
     git-lfs \
     curl \
     wget \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* && \
+    update-ca-certificates
 
 # Install Miniconda
 RUN wget --no-check-certificate https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
@@ -26,7 +28,7 @@ ENV PATH="$HOME/miniconda/bin:$PATH"
 RUN conda init bash
 
 # Clone the repository and navigate into it
-RUN git clone https://github.com/antgroup/echomimic_v2 && cd echomimic_v2
+RUN git clone https://github.com/ekrata/echomimic_v2 && cd echomimic_v2
 
 # Create and activate the 'echomimic' conda environment
 RUN conda create -n echomimic python=3.10 -y && \
