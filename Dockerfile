@@ -34,7 +34,7 @@ RUN git clone https://github.com/ekrata/echomimic_v2 && cd echomimic_v2
 RUN conda create -n echomimic python=3.10 -y && \
     /bin/bash -c "source activate echomimic && \
     pip install pip -U && \
-    pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.0.1 xformers==0.0.28.post3 --index-url https://download.pytorch.org/whl/cu124 && \
+    pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 xformers==0.0.28.post3 --index-url https://download.pytorch.org/whl/cu124 && \
     pip install torchao --index-url https://download.pytorch.org/whl/nightly/cu124 && \
     pip install -r echomimic_v2/requirements.txt && \
     pip install --no-deps facenet_pytorch==2.6.0 && \
