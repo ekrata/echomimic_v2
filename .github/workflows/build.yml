@@ -12,8 +12,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Build Docker Image
-        run: docker build -t echomimic_v2:build .
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_ACCESS_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build and Push Temporary Image
+        run: |
+          docker build -t ekrata/echomimic_v2:build .
+          docker push ekrata/echomimic_v2:build
 
       # - name: Test Docker Image
       #   run: docker run echomimic_v2:build npm test
@@ -25,9 +30,10 @@ jobs:
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKER_ACCESS_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      - name: Tag and Push Staging Image
+      - name: Pull and Tag Staging Image
         run: |
-          docker tag echomimic_v2:build ekrata/echomimic_v2:staging
+          docker pull ekrata/echomimic_v2:build
+          docker tag ekrata/echomimic_v2:build ekrata/echomimic_v2:staging
           docker push ekrata/echomimic_v2:staging
 
   publish_to_production:
