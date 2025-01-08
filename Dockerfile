@@ -18,6 +18,8 @@ git lfs install
 # Set working directory
 WORKDIR /app
 
+RUN chmod -R 777 /app
+
 # Copy the requirements file into the container
 COPY requirements.txt .
 
@@ -44,22 +46,31 @@ ENV FFMPEG_PATH /app/ffmpeg-4.4-amd64-static
 # Set up Git LFS
 RUN git lfs install
 
+RUN git lfs install --skip-smudge
+
+RUN df -h
 # Clone pretrained weights repository if not already done
 RUN if [ ! -d "pretrained_weights" ]; then \
-        git clone https://huggingface.co/BadToBest/EchoMimicV2 pretrained_weights; \
+        git clone --depth 1 https://huggingface.co/BadToBest/EchoMimicV2 pretrained_weights; \
     fi
+
+RUN df -h
 
 # Clone additional repositories
 RUN mkdir -p ./pretrained_weights/sd-vae-ft-mse && \
     if [ -z "$(ls -A ./pretrained_weights/sd-vae-ft-mse)" ]; then \
-        git clone https://huggingface.co/stabilityai/sd-vae-ft-mse ./pretrained_weights/sd-vae-ft-mse; \
+        git clone --depth 1 https://huggingface.co/stabilityai/sd-vae-ft-mse ./pretrained_weights/sd-vae-ft-mse; \
     fi
+
+RUN df -h
 
 RUN mkdir -p ./pretrained_weights/sd-image-variations-diffusers && \
     if [ -z "$(ls -A ./pretrained_weights/sd-image-variations-diffusers)" ]; then \
         git clone https://huggingface.co/lambdalabs/sd-image-variations-diffusers ./pretrained_weights/sd-image-variations-diffusers; \
     fi
 
+
+RUN df -h
 # Verify required model files in pretrained_weights
 RUN if [ ! -f "./pretrained_weights/denoising_unet.pth" ]; then \
         echo "Missing file: denoising_unet.pth"; exit 1; \
