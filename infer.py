@@ -4,6 +4,7 @@ import random
 from pathlib import Path
 
 import numpy as np
+import runpod
 import torch
 from diffusers import AutoencoderKL, DDIMScheduler
 from moviepy.editor import AudioFileClip, VideoFileClip
@@ -245,3 +246,11 @@ def main(args=parse_args()):
     )
     os.system("rm {}".format(save_name + "_woa_sig.mp4"))
     return save_name
+
+
+runpod.serverless.start(
+    {
+        "handler": main,  # Required: Specify the async handler
+        "return_aggregate_stream": True,  # Optional: Aggregate results are accessible via /run endpoint
+    }
+)
