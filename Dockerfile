@@ -1,60 +1,94 @@
-# Start with a base image
-FROM ubuntu:22.04
+# Use an appropriate Python base image
+FROM python:3.12-slim
 
-# Set environment variables
-ENV DEBIAN_FRONTEND=noninteractive
-ENV HOME=/root
-
-# Install system dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    git \
-    git-lfs \
-    curl \
+# Install dependencies and utilities (wget, git, ffmpeg)
+RUN apt-get update && apt-get install -y \
     wget \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/* && \
-    update-ca-certificates
+    git \
+    ffmpeg \
+    curl \
+    xz-utils \
+    && apt-get clean
 
-# Install Miniconda
-RUN wget --no-check-certificate https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
-    bash miniconda.sh -b -p $HOME/miniconda && \
-    rm miniconda.sh
+# Install Git LFS
+RUN curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash && \
+apt-get install -y git-lfs && \
+git lfs install
 
-# Add Miniconda to PATH
-ENV PATH="$HOME/miniconda/bin:$PATH"
+# Set working directory
+WORKDIR /app
 
-# Initialize conda
-RUN conda init bash
+# Copy the requirements file into the container
+COPY requirements.txt .
 
-# Clone the repository and navigate into it
-RUN git clone https://github.com/ekrata/echomimic_v2 && cd echomimic_v2
+# Upgrade pip
+RUN pip install --upgrade pip
 
-# Create and activate the 'echomimic' conda environment
-RUN conda create -n echomimic python=3.10 -y && \
-    /bin/bash -c "source activate echomimic && \
-    pip install pip -U && \
-    pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 xformers==0.0.28.post3 --index-url https://download.pytorch.org/whl/cu124 && \
-    pip install torchao --index-url https://download.pytorch.org/whl/nightly/cu124 && \
-    pip install -r echomimic_v2/requirements.txt && \
-    pip install --no-deps facenet_pytorch==2.6.0 && \
-    git lfs install && \
-    git clone https://huggingface.co/BadToBest/EchoMimicV2 echomimic_v2/pretrained_weights"
+# Install Python dependencies from requirements.txt
+RUN pip install -r requirements.txt
+
+# Install specific versions of torch and other dependencies
+RUN pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 xformers==0.0.28.post3 --index-url https://download.pytorch.org/whl/cu124
+RUN pip install torchao --index-url https://download.pytorch.org/whl/nightly/cu124
+RUN pip install --no-deps facenet_pytorch==2.6.0
+
+# Set up FFmpeg
+RUN if [ ! -d "ffmpeg-4.4-amd64-static" ]; then \
+        wget https://www.johnvansickle.com/ffmpeg/old-releases/ffmpeg-4.4-amd64-static.tar.xz && \
+        tar -xvf ffmpeg-4.4-amd64-static.tar.xz; \
+    fi
+
+# Set FFmpeg path environment variable
+ENV FFMPEG_PATH /app/ffmpeg-4.4-amd64-static
+
+# Set up Git LFS
+RUN git lfs install
+
+RUN df -h
+# Clone pretrained weights repository if not already done
+RUN if [ ! -d "pretrained_weights" ]; then \
+        git clone --depth 1 https://huggingface.co/BadToBest/EchoMimicV2 pretrained_weights; \
+    fi
+
+RUN df -h
+
+# Clone additional repositories
+RUN mkdir -p ./pretrained_weights/sd-vae-ft-mse && \
+    if [ -z "$(ls -A ./pretrained_weights/sd-vae-ft-mse)" ]; then \
+        git clone --depth 1 https://huggingface.co/stabilityai/sd-vae-ft-mse ./pretrained_weights/sd-vae-ft-mse; \
+    fi
+
+RUN df -h
+
+RUN mkdir -p ./pretrained_weights/sd-image-variations-diffusers && \
+    if [ -z "$(ls -A ./pretrained_weights/sd-image-variations-diffusers)" ]; then \
+        git clone https://huggingface.co/lambdalabs/sd-image-variations-diffusers ./pretrained_weights/sd-image-variations-diffusers; \
+    fi
 
 
-# Set the default command to activate the conda environment
-RUN ["/bin/bash", "-c", "source activate echomimic && bash"]
+RUN df -h
+# Verify required model files in pretrained_weights
+RUN if [ ! -f "./pretrained_weights/denoising_unet.pth" ]; then \
+        echo "Missing file: denoising_unet.pth"; exit 1; \
+    fi && \
+    if [ ! -f "./pretrained_weights/reference_unet.pth" ]; then \
+        echo "Missing file: reference_unet.pth"; exit 1; \
+    fi && \
+    if [ ! -f "./pretrained_weights/motion_module.pth" ]; then \
+        echo "Missing file: motion_module.pth"; exit 1; \
+    fi && \
+    if [ ! -f "./pretrained_weights/pose_encoder.pth" ]; then \
+        echo "Missing file: pose_encoder.pth"; exit 1; \
+    fi
 
-CMD sh linux_setup.sh
+# Set up audio processor and download tiny.pt model
+RUN AUDIO_PROCESSOR_DIR="./pretrained_weights/audio_processor" && \
+    mkdir -p "$AUDIO_PROCESSOR_DIR" && \
+    cd "$AUDIO_PROCESSOR_DIR" && \
+    if [ ! -f "tiny.pt" ]; then \
+        wget https://openaipublic.azureedge.net/main/whisper/models/65147644a518d12f04e32d6f3b26facc3f8dd46e5390956a9424a650c0ce22b9/tiny.pt; \
+    fi && \
+    cd ../../..
 
-
-### Notes:
-# 1. **Base Image**: Uses `ubuntu:22.04` as the base image. Adjust the version as needed.
-# 2. **Environment Setup**: Sets up Miniconda, initializes it, and adds it to the path.
-# 3. **Repository Setup**: Clones the specified GitHub repository.
-# 4. **Conda Environment**: Creates and activates a conda environment named `echomimic`.
-# 5. **Python Packages**: Installs specified Python packages and handles pre-trained weights.
-# 6. **File Cleanup**: Reduces Docker image size by removing any interim files where possible.
-# 7. **Entry Command**: Sets the shell to start in an activated conda environment.
-
-# Before building this Dockerfile, ensure your application’s dependency versions match those available with your selection, especially for PyTorch, as those links and versions may change over time.
+# Final message
+RUN echo "Setup complete!"
